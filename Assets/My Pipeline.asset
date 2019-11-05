@@ -12,3 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2fdb73b8fbaf4a04ab4cdebf6caec731, type: 3}
   m_Name: My Pipeline
   m_EditorClassIdentifier: 
+  dynamicBatching: 0
+  instancing: 1

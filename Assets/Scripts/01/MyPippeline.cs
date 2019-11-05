@@ -7,6 +7,18 @@ using UnityEngine.Rendering;
 using Conditional = System.Diagnostics.ConditionalAttribute;
 public class MyPippeline : RenderPipeline
 {
+    DrawRendererFlags drawFlags;
+    public MyPippeline(bool dynamicBatching,bool instancing)
+    {
+        if(dynamicBatching)
+        {
+            drawFlags = DrawRendererFlags.EnableDynamicBatching;
+        }
+        if(instancing)
+        {
+            drawFlags |= DrawRendererFlags.EnableInstancing;
+        }
+    }
     CullResults cull;
     CommandBuffer buffer = new CommandBuffer
     {
@@ -31,8 +43,8 @@ public class MyPippeline : RenderPipeline
         {
             return;
         }
-      
-        
+        cull = CullResults.Cull(ref cullingParameters, rendercontext);
+
         rendercontext.SetupCameraProperties(cam);
       
         CameraClearFlags clearFlags = cam.clearFlags;
@@ -49,10 +61,12 @@ public class MyPippeline : RenderPipeline
 
         var drawSetting = new DrawRendererSettings(cam,new ShaderPassName("SRPDefaultUnlit"));
         drawSetting.sorting.flags = SortFlags.CommonOpaque;
+        drawSetting.flags = drawFlags;
+
         var filterSetting = new FilterRenderersSettings(true) {
             renderQueueRange = RenderQueueRange.opaque
         };
-        cull = CullResults.Cull(ref cullingParameters, rendercontext);
+      
         rendercontext.DrawRenderers(cull.visibleRenderers, ref drawSetting, filterSetting);
         rendercontext.DrawSkybox(cam);
         drawSetting.sorting.flags = SortFlags.CommonTransparent;
