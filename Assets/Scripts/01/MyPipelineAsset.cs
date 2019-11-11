@@ -29,7 +29,7 @@ public class MyPipelineAsset : RenderPipelineAsset
     }
     protected override IRenderPipeline InternalCreatePipeline()
     {
-        return new MyPippeline(dynamicBatching,instancing,(int)shadowMapSize);
+        return new MyPipeline(dynamicBatching,instancing,(int)shadowMapSize);
     }
     // Update is called once per frame
     void Update()
