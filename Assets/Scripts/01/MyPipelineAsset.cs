@@ -12,6 +12,16 @@ public class MyPipelineAsset : RenderPipelineAsset
 
     [SerializeField]
     bool instancing;
+
+    public enum ShadowMapSize {
+        _256 = 256,
+        _512 = 512,
+        _1024 = 1024,
+        _2048 = 2048,
+        _4096 = 4096
+    }
+
+    [SerializeField] private ShadowMapSize shadowMapSize = ShadowMapSize._1024;
     // Start is called before the first frame update
     void Start()
     {
@@ -19,7 +29,7 @@ public class MyPipelineAsset : RenderPipelineAsset
     }
     protected override IRenderPipeline InternalCreatePipeline()
     {
-        return new MyPippeline(dynamicBatching,instancing);
+        return new MyPippeline(dynamicBatching,instancing,(int)shadowMapSize);
     }
     // Update is called once per frame
     void Update()

@@ -25,7 +25,14 @@ public class MyPippeline : RenderPipeline
 
     static int lightIndicesOffsetAndCountID =
     Shader.PropertyToID("unity_LightIndicesOffsetAndCount");
-    public MyPippeline(bool dynamicBatching,bool instancing)
+
+    private static int shadowMapId = Shader.PropertyToID("_ShadowMap");
+
+    private static int worldToShadowMatrixId = Shader.PropertyToID("_WorldToShadowMatrix");
+    private RenderTexture shadowMap;
+
+    private int shadowMapSize;
+    public MyPippeline(bool dynamicBatching,bool instancing,int _shadowMapSize)
     {
         GraphicsSettings.lightsUseLinearIntensity = true;
         if(dynamicBatching)
@@ -36,12 +43,20 @@ public class MyPippeline : RenderPipeline
         {
             drawFlags |= DrawRendererFlags.EnableInstancing;
         }
+
+        this.shadowMapSize = _shadowMapSize;
     }
     CullResults cull;
     CommandBuffer buffer = new CommandBuffer
     {
         name = "Render Camera"
     };
+
+    private CommandBuffer shadowBuffer = new CommandBuffer()
+    {
+        name = "Render Shadows"
+    };
+        
 
     Material errorMaterial;
     public override void Render(ScriptableRenderContext renderContext, Camera[] cameras)
@@ -62,7 +77,9 @@ public class MyPippeline : RenderPipeline
             return;
         }
         cull = CullResults.Cull(ref cullingParameters, rendercontext);
-
+        //设置阴影
+        RenderShadows(rendercontext);
+        
         rendercontext.SetupCameraProperties(cam);
       
         CameraClearFlags clearFlags = cam.clearFlags;
@@ -119,7 +136,60 @@ public class MyPippeline : RenderPipeline
         buffer.Clear();
         rendercontext.Submit();
 
+        if (shadowMap)
+        {
+            RenderTexture.ReleaseTemporary(shadowMap);
+            shadowMap = null;
+        }
+
     }
+
+    void RenderShadows(ScriptableRenderContext context)
+    {
+        shadowMap = RenderTexture.GetTemporary(shadowMapSize, shadowMapSize, 16, RenderTextureFormat.Shadowmap);
+        shadowMap.filterMode = FilterMode.Bilinear;
+        shadowMap.wrapMode = TextureWrapMode.Clamp;
+        
+        CoreUtils.SetRenderTarget(shadowBuffer,shadowMap,RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, ClearFlag.Depth);
+        shadowBuffer.BeginSample("Render Shadow");
+        context.ExecuteCommandBuffer(shadowBuffer);
+        shadowBuffer.Clear();
+        
+        
+        shadowBuffer.EndSample("Render Shadow");
+        context.ExecuteCommandBuffer(shadowBuffer);
+        shadowBuffer.Clear();
+
+        Matrix4x4 viewMatrix, projectionMatrix;
+        ShadowSplitData splitData;
+        cull.ComputeSpotShadowMatricesAndCullingPrimitives(0, out viewMatrix, out projectionMatrix, out splitData);
+        shadowBuffer.SetViewProjectionMatrices(viewMatrix,projectionMatrix);
+        if (SystemInfo.usesReversedZBuffer)
+        {
+//            projectionMatrix.m20 = -projectionMatrix.m20;
+                                                           //            projectionMatrix.m21 = -projectionMatrix.m21;
+                                                           //            projectionMatrix.m22 = -projectionMatrix.m22;
+                                                           //            projectionMatrix.m23 = -projectionMatrix.m23;
+        }
+
+       // var scaleOffset = Matrix4x4.TRS(Vector3.one * 0.5f, Quaternion.identity, Vector3.one * 0.5f);
+        
+        var scaleOffset = Matrix4x4.identity;
+        scaleOffset.m00 = scaleOffset.m11 = scaleOffset.m22 = 0.5f;
+        scaleOffset.m03 = scaleOffset.m13 = scaleOffset.m23 = 0.5f;
+        Matrix4x4 worldToShadowMatrix = (viewMatrix * projectionMatrix)*scaleOffset;
+        shadowBuffer.SetGlobalMatrix(worldToShadowMatrixId,worldToShadowMatrix);
+        shadowBuffer.SetGlobalTexture(shadowMapId,shadowMap);
+        context.ExecuteCommandBuffer(shadowBuffer);
+        shadowBuffer.Clear();
+        
+        var shadowSettings = new DrawShadowsSettings(cull,0);
+        context.DrawShadows(ref shadowSettings);
+     
+    
+    }
+    
+     
     void ConfigureLights()
     {
         
